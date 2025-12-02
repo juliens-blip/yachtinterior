@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
-if (!GEMINI_API_KEY) {
-  throw new Error('Missing GEMINI_API_KEY environment variable');
-}
-
 const styles = [
   {
     name: "Contemporain Minimaliste",
@@ -175,8 +169,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing image data' }, { status: 400 });
     }
 
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+    if (!GEMINI_API_KEY) {
+      return NextResponse.json(
+        { error: 'Missing GEMINI_API_KEY environment variable' },
+        { status: 500 }
+      );
+    }
+
     const ai = new GoogleGenAI({
-      apiKey: GEMINI_API_KEY!
+      apiKey: GEMINI_API_KEY
     });
 
     // Phase 1: Analyze structure
