@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
         let mimeType = "image/jpeg";
 
         if (generatedImageBase64) {
-          if (result.candidates[0].content.parts[0].inlineData?.mimeType) {
+          if (result.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType) {
             mimeType = result.candidates[0].content.parts[0].inlineData.mimeType;
           }
           imageUrl = `data:${mimeType};base64,${generatedImageBase64}`;
