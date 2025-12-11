@@ -359,6 +359,15 @@ body {
   transform: translateY(-2px);
 }
 
+.auth-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.auth-link {
+  text-decoration: none;
+}
+
 /* Preview Section & Scanning Effect */
 .preview-section {
   position: relative;

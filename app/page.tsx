@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from './lib/supabaseClient';
 import ASCIIText from './components/ASCIIText';
 import SplitText from './components/SplitText';
 
@@ -12,11 +15,39 @@ interface GeneratedImage {
 }
 
 export default function Home() {
+  const router = useRouter();
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [step, setStep] = useState<'landing' | 'upload' | 'processing' | 'results'>('landing');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        router.replace('/auth');
+        return;
+      }
+      if (mounted) setCheckingAuth(false);
+    };
+
+    checkSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.replace('/auth');
+      }
+    });
+
+    return () => {
+      mounted = false;
+      authListener?.subscription.unsubscribe();
+    };
+  }, [router]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -69,11 +100,34 @@ export default function Home() {
     }
   };
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.replace('/auth');
+  };
+
+  if (checkingAuth) {
+    return (
+      <div className="app-container">
+        <main className="main-content">
+          <p>Vérification de la session...</p>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       <nav className="navbar glass-panel">
         <div className="logo">YachtGenius</div>
         <div className="powered-by">POWERED BY AI</div>
+        <div className="auth-actions">
+          <Link className="btn-primary auth-link" href="/auth">
+            Auth
+          </Link>
+          <button className="btn-primary" onClick={handleSignOut}>
+            Déconnexion
+          </button>
+        </div>
       </nav>
 
       <main className="main-content">
