@@ -48,17 +48,26 @@ export async function POST(request: NextRequest) {
           }
 
           // Fetch full subscription details
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId) as Stripe.Subscription;
+          const subscriptionResponse = await stripe.subscriptions.retrieve(subscriptionId);
+          const {
+            id: subId,
+            items,
+            status: subStatus,
+            current_period_start,
+            current_period_end,
+            cancel_at_period_end: cancelAtPeriodEnd,
+            canceled_at
+          } = subscriptionResponse as any;
 
           await upsertSubscription(userId, customerId, {
-            stripe_subscription_id: subscription.id,
-            stripe_price_id: subscription.items.data[0].price.id,
-            status: subscription.status,
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            cancel_at_period_end: subscription.cancel_at_period_end,
-            canceled_at: subscription.canceled_at
-              ? new Date(subscription.canceled_at * 1000).toISOString()
+            stripe_subscription_id: subId,
+            stripe_price_id: items.data[0].price.id,
+            status: subStatus,
+            current_period_start: new Date(current_period_start * 1000).toISOString(),
+            current_period_end: new Date(current_period_end * 1000).toISOString(),
+            cancel_at_period_end: cancelAtPeriodEnd,
+            canceled_at: canceled_at
+              ? new Date(canceled_at * 1000).toISOString()
               : null,
           });
 
@@ -68,7 +77,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object as any;
         const customerId = subscription.customer as string;
         const userId = subscription.metadata.supabase_user_id;
 
@@ -94,7 +103,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object as any;
         const customerId = subscription.customer as string;
         const userId = subscription.metadata.supabase_user_id;
 
@@ -115,17 +124,17 @@ export async function POST(request: NextRequest) {
       }
 
       case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice;
+        const invoice = event.data.object as any;
         const subscriptionId = invoice.subscription as string;
 
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId) as Stripe.Subscription;
-          const userId = subscription.metadata.supabase_user_id;
-          const customerId = subscription.customer as string;
+          const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId) as any;
+          const userId = subscriptionData.metadata.supabase_user_id;
+          const customerId = subscriptionData.customer as string;
 
           if (userId) {
             await upsertSubscription(userId, customerId, {
-              stripe_subscription_id: subscription.id,
+              stripe_subscription_id: subscriptionData.id,
               status: 'past_due',
             });
 
