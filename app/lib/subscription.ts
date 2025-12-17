@@ -19,7 +19,7 @@ export async function hasActiveSubscription(accessToken?: string): Promise<boole
   if (!data) return false;
 
   // Active subscription
-  if (data.status === 'active') return true;
+  if (data.status === 'active' || data.status === 'trialing') return true;
 
   // Canceled but still in valid period
   if (data.status === 'canceled' && data.current_period_end) {

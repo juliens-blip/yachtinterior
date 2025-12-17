@@ -70,11 +70,16 @@ export async function middleware(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
+    const now = new Date();
     const hasActiveSubscription =
       subscription?.status === 'active' ||
+      subscription?.status === 'trialing' ||
       (subscription?.status === 'canceled' &&
        subscription?.current_period_end &&
-       new Date(subscription.current_period_end) > new Date());
+       new Date(subscription.current_period_end) > now) ||
+      (subscription?.status === 'past_due' &&
+       subscription?.current_period_end &&
+       new Date(subscription.current_period_end) > now);
 
     if (!hasActiveSubscription) {
       return NextResponse.redirect(new URL('/auth', request.url));
