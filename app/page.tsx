@@ -32,6 +32,25 @@ export default function Home() {
         router.replace('/auth');
         return;
       }
+
+      // Check subscription status
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('status, current_period_end')
+        .eq('user_id', data.session.user.id)
+        .single();
+
+      const hasActiveSubscription =
+        subscription?.status === 'active' ||
+        (subscription?.status === 'canceled' &&
+         subscription?.current_period_end &&
+         new Date(subscription.current_period_end) > new Date());
+
+      if (!hasActiveSubscription) {
+        router.replace('/auth');
+        return;
+      }
+
       if (mounted) setCheckingAuth(false);
     };
 
@@ -105,6 +124,16 @@ export default function Home() {
     router.replace('/auth');
   };
 
+  const handleManageSubscription = async () => {
+    try {
+      const response = await fetch('/api/portal', { method: 'POST' });
+      const { url } = await response.json();
+      if (url) window.location.href = url;
+    } catch (error) {
+      console.error('Error opening customer portal:', error);
+    }
+  };
+
   if (checkingAuth) {
     return (
       <div className="app-container">
@@ -121,9 +150,9 @@ export default function Home() {
         <div className="logo">YachtGenius</div>
         <div className="powered-by">POWERED BY AI</div>
         <div className="auth-actions">
-          <Link className="btn-primary auth-link" href="/auth">
-            Auth
-          </Link>
+          <button className="btn-primary" onClick={handleManageSubscription}>
+            Gérer l'abonnement
+          </button>
           <button className="btn-primary" onClick={handleSignOut}>
             Déconnexion
           </button>

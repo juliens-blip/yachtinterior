@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { createClient } from '@/app/lib/supabase-server';
+import { hasActiveSubscription } from '@/app/lib/subscription';
 
 const styles = [
   {
@@ -163,6 +165,35 @@ NOW GENERATE THE IMAGE.
 
 export async function POST(request: NextRequest) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const accessToken = authHeader?.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7)
+      : undefined;
+
+    // 1. Auth check
+    const supabase = await createClient({ accessToken });
+    const { data: { user }, error: authError } = accessToken
+      ? await supabase.auth.getUser(accessToken)
+      : await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
+    }
+
+    // 2. Subscription check
+    const hasSubscription = await hasActiveSubscription(accessToken);
+
+    if (!hasSubscription) {
+      return NextResponse.json(
+        { error: 'Active subscription required', redirect: '/auth' },
+        { status: 403 }
+      );
+    }
+
+    // 3. Continue with image generation
     const { imageBase64 } = await request.json();
 
     if (!imageBase64) {
