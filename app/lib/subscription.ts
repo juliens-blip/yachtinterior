@@ -43,16 +43,29 @@ export async function upsertSubscription(
 ) {
   const supabase = createServiceClient();
 
-  const { error } = await supabase
-    .from('subscriptions')
-    .upsert({
-      user_id: userId,
-      stripe_customer_id: stripeCustomerId,
-      ...subscriptionData,
-      updated_at: new Date().toISOString(),
-    }, {
-      onConflict: 'user_id'
-    });
+  const payload = {
+    user_id: userId,
+    stripe_customer_id: stripeCustomerId,
+    ...subscriptionData,
+    updated_at: new Date().toISOString(),
+  };
+
+  const attemptUpsert = async (body: Record<string, any>) => {
+    return supabase
+      .from('subscriptions')
+      .upsert(body, {
+        onConflict: 'user_id'
+      });
+  };
+
+  // Try with all fields (including email). If the schema in prod doesn't yet have "email",
+  // fall back by removing it to avoid PGRST204 "column not found".
+  let { error } = await attemptUpsert(payload);
+  if (error && (error as any).code === 'PGRST204') {
+    const { email, ...rest } = payload as any;
+    const retry = await attemptUpsert(rest);
+    error = retry.error;
+  }
 
   if (error) {
     console.error('Error upserting subscription:', error);
