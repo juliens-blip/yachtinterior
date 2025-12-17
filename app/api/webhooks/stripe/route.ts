@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Fetch full subscription details
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId) as Stripe.Subscription;
 
           await upsertSubscription(userId, customerId, {
             stripe_subscription_id: subscription.id,
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         const subscriptionId = invoice.subscription as string;
 
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId) as Stripe.Subscription;
           const userId = subscription.metadata.supabase_user_id;
           const customerId = subscription.customer as string;
 
