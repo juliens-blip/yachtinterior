@@ -163,6 +163,9 @@ NOW GENERATE THE IMAGE.
   `.trim();
 }
 
+// Force dynamic rendering - prevent static generation during build
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');

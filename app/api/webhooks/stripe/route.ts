@@ -3,6 +3,9 @@ import { stripe } from '@/app/lib/stripe';
 import { upsertSubscription } from '@/app/lib/subscription';
 import Stripe from 'stripe';
 
+// Force dynamic rendering - prevent static generation during build
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');

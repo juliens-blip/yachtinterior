@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/app/lib/stripe';
 import { createClient } from '@/app/lib/supabase-server';
 
+// Force dynamic rendering - prevent static generation during build
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
