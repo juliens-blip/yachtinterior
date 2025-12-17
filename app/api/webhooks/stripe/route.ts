@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
+  const toIso = (ts?: number | null) =>
+    ts ? new Date(ts * 1000).toISOString() : null;
 
   if (!signature) {
     return NextResponse.json(
@@ -71,9 +73,6 @@ export async function POST(request: NextRequest) {
             canceled_at
           } = subscriptionResponse as any;
 
-          const toIso = (ts?: number | null) =>
-            ts ? new Date(ts * 1000).toISOString() : null;
-
           console.log(`[WEBHOOK] Subscription status: ${subStatus}`);
           console.log(`[WEBHOOK] Current period end: ${toIso(current_period_end)}`);
 
@@ -90,7 +89,7 @@ export async function POST(request: NextRequest) {
             email: customerEmail,
           });
 
-          console.log(`[WEBHOOK] ✅ Subscription created successfully for user ${userId}`);
+          console.log(`[WEBHOOK] Subscription created successfully for user ${userId}`);
         }
         break;
       }
@@ -110,9 +109,6 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        const toIso = (ts?: number | null) =>
-          ts ? new Date(ts * 1000).toISOString() : null;
-
         await upsertSubscription(userId, customerId, {
           stripe_subscription_id: subscription.id,
           stripe_price_id: subscription.items.data[0].price.id,
@@ -123,7 +119,7 @@ export async function POST(request: NextRequest) {
           canceled_at: toIso(subscription.canceled_at),
         });
 
-        console.log(`[WEBHOOK] ✅ Subscription updated successfully for user ${userId}`);
+        console.log(`[WEBHOOK] Subscription updated successfully for user ${userId}`);
         break;
       }
 
@@ -141,9 +137,6 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        const toIso = (ts?: number | null) =>
-          ts ? new Date(ts * 1000).toISOString() : null;
-
         await upsertSubscription(userId, customerId, {
           stripe_subscription_id: subscription.id,
           status: 'canceled',
@@ -151,7 +144,7 @@ export async function POST(request: NextRequest) {
           canceled_at: new Date().toISOString(),
         });
 
-        console.log(`[WEBHOOK] ✅ Subscription deleted successfully for user ${userId}`);
+        console.log(`[WEBHOOK] Subscription deleted successfully for user ${userId}`);
         break;
       }
 
@@ -170,9 +163,6 @@ export async function POST(request: NextRequest) {
 
           console.log(`[WEBHOOK] User ID: ${userId}`);
 
-          const toIso = (ts?: number | null) =>
-            ts ? new Date(ts * 1000).toISOString() : null;
-
           if (userId) {
             await upsertSubscription(userId, customerId, {
               stripe_subscription_id: subscriptionData.id,
@@ -182,7 +172,7 @@ export async function POST(request: NextRequest) {
               canceled_at: toIso(subscriptionData.canceled_at),
             });
 
-            console.log(`[WEBHOOK] ⚠️  Payment failed - subscription marked as past_due for user ${userId}`);
+            console.log(`[WEBHOOK] Payment failed - subscription marked as past_due for user ${userId}`);
           } else {
             console.warn('[WEBHOOK] WARNING: No supabase_user_id in subscription metadata');
           }
@@ -190,14 +180,66 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'invoice.payment_succeeded':
+      case 'invoice.paid': {
+        const invoice = event.data.object as any;
+        const invoiceId = invoice.id as string | undefined;
+        const subscriptionIdFromInvoice = invoice.subscription as string | undefined;
+        const customerIdFromInvoice = invoice.customer as string | undefined;
+
+        console.log(`[WEBHOOK] Processing ${event.type}`);
+        console.log(`[WEBHOOK] Invoice ID: ${invoiceId}`);
+        console.log(`[WEBHOOK] Subscription (from invoice): ${subscriptionIdFromInvoice}`);
+
+        const invoiceDetails = invoiceId
+          ? await stripe.invoices.retrieve(invoiceId)
+          : invoice;
+
+        const subscriptionId = (invoiceDetails.subscription as string) || subscriptionIdFromInvoice;
+        const customerId = (invoiceDetails.customer as string) || customerIdFromInvoice;
+
+        if (!subscriptionId || !customerId) {
+          console.warn('[WEBHOOK] WARNING: Missing subscriptionId or customerId on invoice.payment_succeeded');
+          break;
+        }
+
+        const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId) as any;
+        const userId = subscriptionData.metadata?.supabase_user_id;
+
+        if (!userId) {
+          console.warn('[WEBHOOK] WARNING: No supabase_user_id in subscription metadata');
+          break;
+        }
+
+        const firstItem = subscriptionData.items.data[0];
+        const emailFromInvoice =
+          (invoiceDetails as any).customer_email ||
+          invoice.customer_email ||
+          invoice.customer_email_address;
+
+        await upsertSubscription(userId, customerId, {
+          stripe_subscription_id: subscriptionData.id,
+          stripe_price_id: firstItem?.price?.id,
+          status: subscriptionData.status || 'active',
+          current_period_start: toIso(subscriptionData.current_period_start),
+          current_period_end: toIso(subscriptionData.current_period_end),
+          cancel_at_period_end: subscriptionData.cancel_at_period_end,
+          canceled_at: toIso(subscriptionData.canceled_at),
+          email: emailFromInvoice,
+        });
+
+        console.log(`[WEBHOOK] Subscription synced from ${event.type} for user ${userId}`);
+        break;
+      }
+
       default:
-        console.log(`[WEBHOOK] ℹ️  Unhandled event type: ${event.type}`);
+        console.log(`[WEBHOOK] Unhandled event type: ${event.type}`);
     }
 
-    console.log(`[WEBHOOK] ✅ Event ${event.type} processed successfully`);
+    console.log(`[WEBHOOK] Event ${event.type} processed successfully`);
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('[WEBHOOK] ❌ Error processing webhook:', error);
+    console.error('[WEBHOOK] Error processing webhook:', error);
     console.error('[WEBHOOK] Error details:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
       { error: 'Webhook processing failed' },
