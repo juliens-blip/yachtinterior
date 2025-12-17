@@ -52,7 +52,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const subscription: Stripe.Subscription = typeof subscriptionData === 'string'
+    type SubscriptionWithPeriods = Stripe.Subscription & {
+      current_period_start?: number | null;
+      current_period_end?: number | null;
+      canceled_at?: number | null;
+    };
+
+    const subscription: SubscriptionWithPeriods = typeof subscriptionData === 'string'
       ? await stripe.subscriptions.retrieve(subscriptionData)
       : subscriptionData;
 
@@ -78,16 +84,17 @@ export async function POST(request: NextRequest) {
         ? (session.customer as Stripe.Customer).email ?? undefined
         : undefined);
 
+    const toIso = (ts?: number | null) =>
+      ts ? new Date(ts * 1000).toISOString() : null;
+
     await upsertSubscription(targetUserId, customerId, {
       stripe_subscription_id: subscription.id,
       stripe_price_id: firstItem?.price?.id,
       status: subscription.status,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      current_period_start: toIso(subscription.current_period_start),
+      current_period_end: toIso(subscription.current_period_end),
       cancel_at_period_end: subscription.cancel_at_period_end,
-      canceled_at: subscription.canceled_at
-        ? new Date(subscription.canceled_at * 1000).toISOString()
-        : null,
+      canceled_at: toIso(subscription.canceled_at),
       email: customerEmail,
     });
 
