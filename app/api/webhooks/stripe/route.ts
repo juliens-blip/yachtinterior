@@ -34,23 +34,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  console.log(`Received webhook: ${event.type}`);
+  console.log(`[WEBHOOK] Received event: ${event.type}`);
 
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+        console.log(`[WEBHOOK] Processing checkout.session.completed`);
 
         if (session.mode === 'subscription') {
           const subscriptionId = session.subscription as string;
           const customerId = session.customer as string;
           const userId = session.metadata?.supabase_user_id;
+          const customerEmail = session.customer_email || session.customer_details?.email;
+
+          console.log(`[WEBHOOK] Subscription ID: ${subscriptionId}`);
+          console.log(`[WEBHOOK] Customer ID: ${customerId}`);
+          console.log(`[WEBHOOK] User ID: ${userId}`);
+          console.log(`[WEBHOOK] Email: ${customerEmail}`);
 
           if (!userId) {
+            console.error('[WEBHOOK] ERROR: No supabase_user_id in session metadata');
             throw new Error('No supabase_user_id in session metadata');
           }
 
           // Fetch full subscription details
+          console.log(`[WEBHOOK] Fetching subscription details from Stripe...`);
           const subscriptionResponse = await stripe.subscriptions.retrieve(subscriptionId);
           const {
             id: subId,
@@ -62,19 +71,26 @@ export async function POST(request: NextRequest) {
             canceled_at
           } = subscriptionResponse as any;
 
+          const toIso = (ts?: number | null) =>
+            ts ? new Date(ts * 1000).toISOString() : null;
+
+          console.log(`[WEBHOOK] Subscription status: ${subStatus}`);
+          console.log(`[WEBHOOK] Current period end: ${toIso(current_period_end)}`);
+
+          console.log(`[WEBHOOK] Upserting subscription to Supabase...`);
+
           await upsertSubscription(userId, customerId, {
             stripe_subscription_id: subId,
             stripe_price_id: items.data[0].price.id,
             status: subStatus,
-            current_period_start: new Date(current_period_start * 1000).toISOString(),
-            current_period_end: new Date(current_period_end * 1000).toISOString(),
+            current_period_start: toIso(current_period_start),
+            current_period_end: toIso(current_period_end),
             cancel_at_period_end: cancelAtPeriodEnd,
-            canceled_at: canceled_at
-              ? new Date(canceled_at * 1000).toISOString()
-              : null,
+            canceled_at: toIso(canceled_at),
+            email: customerEmail,
           });
 
-          console.log(`Subscription created for user ${userId}`);
+          console.log(`[WEBHOOK] ✅ Subscription created successfully for user ${userId}`);
         }
         break;
       }
@@ -84,24 +100,30 @@ export async function POST(request: NextRequest) {
         const customerId = subscription.customer as string;
         const userId = subscription.metadata.supabase_user_id;
 
+        console.log(`[WEBHOOK] Processing customer.subscription.updated`);
+        console.log(`[WEBHOOK] Subscription ID: ${subscription.id}`);
+        console.log(`[WEBHOOK] User ID: ${userId}`);
+        console.log(`[WEBHOOK] New status: ${subscription.status}`);
+
         if (!userId) {
-          console.warn('No supabase_user_id in subscription metadata');
+          console.warn('[WEBHOOK] WARNING: No supabase_user_id in subscription metadata');
           break;
         }
+
+        const toIso = (ts?: number | null) =>
+          ts ? new Date(ts * 1000).toISOString() : null;
 
         await upsertSubscription(userId, customerId, {
           stripe_subscription_id: subscription.id,
           stripe_price_id: subscription.items.data[0].price.id,
           status: subscription.status,
-          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_start: toIso(subscription.current_period_start),
+          current_period_end: toIso(subscription.current_period_end),
           cancel_at_period_end: subscription.cancel_at_period_end,
-          canceled_at: subscription.canceled_at
-            ? new Date(subscription.canceled_at * 1000).toISOString()
-            : null,
+          canceled_at: toIso(subscription.canceled_at),
         });
 
-        console.log(`Subscription updated for user ${userId}`);
+        console.log(`[WEBHOOK] ✅ Subscription updated successfully for user ${userId}`);
         break;
       }
 
@@ -110,19 +132,26 @@ export async function POST(request: NextRequest) {
         const customerId = subscription.customer as string;
         const userId = subscription.metadata.supabase_user_id;
 
+        console.log(`[WEBHOOK] Processing customer.subscription.deleted`);
+        console.log(`[WEBHOOK] Subscription ID: ${subscription.id}`);
+        console.log(`[WEBHOOK] User ID: ${userId}`);
+
         if (!userId) {
-          console.warn('No supabase_user_id in subscription metadata');
+          console.warn('[WEBHOOK] WARNING: No supabase_user_id in subscription metadata');
           break;
         }
+
+        const toIso = (ts?: number | null) =>
+          ts ? new Date(ts * 1000).toISOString() : null;
 
         await upsertSubscription(userId, customerId, {
           stripe_subscription_id: subscription.id,
           status: 'canceled',
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_end: toIso(subscription.current_period_end),
           canceled_at: new Date().toISOString(),
         });
 
-        console.log(`Subscription deleted for user ${userId}`);
+        console.log(`[WEBHOOK] ✅ Subscription deleted successfully for user ${userId}`);
         break;
       }
 
@@ -130,30 +159,46 @@ export async function POST(request: NextRequest) {
         const invoice = event.data.object as any;
         const subscriptionId = invoice.subscription as string;
 
+        console.log(`[WEBHOOK] Processing invoice.payment_failed`);
+        console.log(`[WEBHOOK] Invoice ID: ${invoice.id}`);
+        console.log(`[WEBHOOK] Subscription ID: ${subscriptionId}`);
+
         if (subscriptionId) {
           const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId) as any;
           const userId = subscriptionData.metadata.supabase_user_id;
           const customerId = subscriptionData.customer as string;
 
+          console.log(`[WEBHOOK] User ID: ${userId}`);
+
+          const toIso = (ts?: number | null) =>
+            ts ? new Date(ts * 1000).toISOString() : null;
+
           if (userId) {
             await upsertSubscription(userId, customerId, {
               stripe_subscription_id: subscriptionData.id,
               status: 'past_due',
+              current_period_start: toIso(subscriptionData.current_period_start),
+              current_period_end: toIso(subscriptionData.current_period_end),
+              canceled_at: toIso(subscriptionData.canceled_at),
             });
 
-            console.log(`Payment failed for user ${userId}`);
+            console.log(`[WEBHOOK] ⚠️  Payment failed - subscription marked as past_due for user ${userId}`);
+          } else {
+            console.warn('[WEBHOOK] WARNING: No supabase_user_id in subscription metadata');
           }
         }
         break;
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        console.log(`[WEBHOOK] ℹ️  Unhandled event type: ${event.type}`);
     }
 
+    console.log(`[WEBHOOK] ✅ Event ${event.type} processed successfully`);
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    console.error('[WEBHOOK] ❌ Error processing webhook:', error);
+    console.error('[WEBHOOK] Error details:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }

@@ -21,41 +21,88 @@ export default function AuthPage() {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const success = searchParams.get('success');
+    const sessionId = searchParams.get('session_id');
     const canceled = searchParams.get('canceled');
 
     if (success) {
       setCheckingSubscription(true);
-      setStatus('Vérification de votre abonnement...');
+      setStatus('Verification de votre abonnement...');
 
-      const interval = setInterval(async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+      let interval: ReturnType<typeof setInterval> | undefined;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
 
-        const { data } = await supabase
-          .from('subscriptions')
-          .select('status')
-          .eq('user_id', user.id)
-          .single();
+      const startPolling = () => {
+        interval = setInterval(async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
 
-        if (data?.status === 'active') {
+          const { data } = await supabase
+            .from('subscriptions')
+            .select('status')
+            .eq('user_id', user.id)
+            .single();
+
+          if (data?.status === 'active') {
+            setCheckingSubscription(false);
+            if (interval) clearInterval(interval);
+            if (timeout) clearTimeout(timeout);
+            setStatus('Abonnement active ! Redirection...');
+            setTimeout(() => router.push('/'), 2000);
+          }
+        }, 2000);
+
+        timeout = setTimeout(() => {
+          if (interval) clearInterval(interval);
           setCheckingSubscription(false);
-          clearInterval(interval);
-          setStatus('Abonnement activé ! Redirection...');
-          setTimeout(() => router.push('/'), 2000);
+          setError('Delai depasse. Merci de rafraichir la page.');
+        }, 30000);
+      };
+
+      const syncSubscription = async () => {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData.session?.access_token;
+
+          if (sessionId && token) {
+            const response = await fetch('/api/stripe/sync', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ session_id: sessionId }),
+            });
+
+            if (!response.ok) {
+              const payload = await response.json();
+              throw new Error(payload.error || 'Synchronisation impossible');
+            }
+            setStatus('Abonnement en cours de validation...');
+          } else {
+            // Pas de session_id: on compte sur le webhook
+            setStatus('Abonnement en cours de validation via webhook...');
+          }
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Impossible de synchroniser la subscription. Le webhook finira peut-etre le travail dans quelques secondes.'
+          );
+        } finally {
+          startPolling();
         }
-      }, 2000);
+      };
 
-      setTimeout(() => {
-        clearInterval(interval);
-        setCheckingSubscription(false);
-        setError('Délai d\'attente dépassé. Veuillez rafraîchir la page.');
-      }, 30000);
+      syncSubscription();
 
-      return () => clearInterval(interval);
+      return () => {
+        if (interval) clearInterval(interval);
+        if (timeout) clearTimeout(timeout);
+      };
     }
 
     if (canceled) {
-      setError('Paiement annulé. Vous pouvez réessayer.');
+      setError('Paiement annule. Vous pouvez reessayer.');
     }
   }, [router]);
 
@@ -65,7 +112,7 @@ export default function AuthPage() {
       const { data: sessionData } = await supabase.auth.getSession();
 
       if (!sessionData.session?.access_token) {
-        setError('Session expirée. Merci de te reconnecter.');
+        setError('Session expiree. Merci de te reconnecter.');
         setLoading(false);
         return;
       }
@@ -86,7 +133,7 @@ export default function AuthPage() {
 
       window.location.href = url;
     } catch (err) {
-      setError('Erreur lors de la création de la session de paiement');
+      setError('Erreur lors de la creation de la session de paiement');
       setLoading(false);
     }
   };
@@ -124,7 +171,7 @@ export default function AuthPage() {
           (subscription?.status === 'canceled' && subscription?.current_period_end && new Date(subscription.current_period_end) > new Date());
 
         if (isActive) {
-          setStatus('Connexion réussie. Redirection...');
+          setStatus('Connexion reussie. Redirection...');
           router.push('/');
         } else {
           setStatus('Abonnement requis');
@@ -143,16 +190,16 @@ export default function AuthPage() {
       if (signUpError) {
         setError(signUpError.message);
       } else if (signUpData.session) {
-        // Si une session est retournée directement (confirmation email désactivée)
-        setStatus('Compte créé ! Abonnement requis...');
+        // If email confirmation is disabled, session comes back immediately
+        setStatus('Compte cree ! Abonnement requis...');
         setTimeout(() => setMode('payment'), 1000);
       } else if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
-        // Email déjà utilisé
-        setError('Cet email est déjà enregistré. Essaie de te connecter.');
+        // Email already used
+        setError('Cet email est deja enregistre. Essaie de te connecter.');
         setMode('signin');
       } else {
-        // Confirmation d'email requise
-        setStatus('Un email de confirmation a été envoyé. Vérifie ta boîte mail pour activer ton compte.');
+        // Email confirmation required
+        setStatus('Un email de confirmation a ete envoye. Verifie ta boite mail pour activer ton compte.');
         setMode('signin');
       }
     }
@@ -171,19 +218,19 @@ export default function AuthPage() {
 
       <main className="auth-grid">
         <section className="auth-hero glass-panel">
-          <p className="eyebrow">Sécurisé par Supabase</p>
+          <p className="eyebrow">Securise par Supabase</p>
           <h1>
-            Accès YachtGenius
+            Acces YachtGenius
             <span className="accent"> Auth</span>
           </h1>
           <p className="lead">
-            Connecte-toi pour poursuivre tes redesigns ou crée un compte pour lancer ta première
-            transformation d&apos;intérieur.
+            Connecte-toi pour poursuivre tes redesigns ou cree un compte pour lancer ta premiere
+            transformation d&apos;interieur.
           </p>
           <div className="hero-highlight">
-            <p>Contrôle total</p>
-            <p>Historique synchronisé</p>
-            <p>Sessions sécurisées</p>
+            <p>Controle total</p>
+            <p>Historique synchronise</p>
+            <p>Sessions securisees</p>
           </div>
         </section>
 
@@ -202,7 +249,7 @@ export default function AuthPage() {
                 border: '1px solid rgba(255, 255, 255, 0.1)'
               }}>
                 <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#D4AF37' }}>
-                  12€<span style={{ fontSize: '1.5rem' }}>/mois</span>
+                  12 EUR<span style={{ fontSize: '1.5rem' }}>/mois</span>
                 </div>
 
                 <ul style={{
@@ -211,11 +258,11 @@ export default function AuthPage() {
                   lineHeight: '2',
                   textAlign: 'left'
                 }}>
-                  <li>✓ Générations illimitées d'intérieurs</li>
-                  <li>✓ 5 styles uniques par génération</li>
-                  <li>✓ IA Gemini 2.5 Flash</li>
-                  <li>✓ Images haute résolution</li>
-                  <li>✓ Support prioritaire</li>
+                  <li>- Generations illimitees d'interieurs</li>
+                  <li>- 5 styles uniques par generation</li>
+                  <li>- IA Gemini 2.5 Flash</li>
+                  <li>- Images haute resolution</li>
+                  <li>- Support prioritaire</li>
                 </ul>
 
                 {error && <p className="status error" style={{ marginBottom: '1rem' }}>{error}</p>}
@@ -227,11 +274,11 @@ export default function AuthPage() {
                   disabled={loading || checkingSubscription}
                   style={{ width: '100%', padding: '1rem', marginBottom: '1rem' }}
                 >
-                  {loading ? 'Redirection vers Stripe...' : checkingSubscription ? 'Vérification...' : 'S\'abonner maintenant'}
+                  {loading ? 'Redirection vers Stripe...' : checkingSubscription ? 'Verification...' : 'S\'abonner maintenant'}
                 </button>
 
                 <p style={{ opacity: 0.7, fontSize: '0.9rem' }}>
-                  Paiement sécurisé par Stripe. Annulez à tout moment.
+                  Paiement securise par Stripe. Annulez a tout moment.
                 </p>
 
                 <button
@@ -246,7 +293,7 @@ export default function AuthPage() {
                   }}
                   type="button"
                 >
-                  Retour à la connexion
+                  Retour a la connexion
                 </button>
               </div>
             </div>
@@ -265,60 +312,60 @@ export default function AuthPage() {
                   onClick={() => setMode('signup')}
                   type="button"
                 >
-                  Création
+                  Creation
                 </button>
               </div>
 
               <form className="auth-form" onSubmit={handleSubmit}>
-            <label className="field">
-              <span>Email</span>
-              <input
-                type="email"
-                placeholder="capitaine@yacht.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </label>
+                <label className="field">
+                  <span>Email</span>
+                  <input
+                    type="email"
+                    placeholder="capitaine@yacht.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </label>
 
-            <label className="field">
-              <span>Mot de passe</span>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </label>
+                <label className="field">
+                  <span>Mot de passe</span>
+                  <input
+                    type="password"
+                    placeholder="********"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </label>
 
-            {mode === 'signup' && (
-              <label className="field">
-                <span>Confirme le mot de passe</span>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </label>
-            )}
+                {mode === 'signup' && (
+                  <label className="field">
+                    <span>Confirme le mot de passe</span>
+                    <input
+                      type="password"
+                      placeholder="********"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      minLength={6}
+                    />
+                  </label>
+                )}
 
-            {error && <p className="status error">{error}</p>}
-            {status && <p className="status success">{status}</p>}
+                {error && <p className="status error">{error}</p>}
+                {status && <p className="status success">{status}</p>}
 
-            <button className="btn-gold full" type="submit" disabled={loading}>
-              {loading ? 'Traitement...' : mode === 'signin' ? 'Se connecter' : "Créer l'accès"}
-            </button>
-          </form>
+                <button className="btn-gold full" type="submit" disabled={loading}>
+                  {loading ? 'Traitement...' : mode === 'signin' ? 'Se connecter' : "Creer l'acces"}
+                </button>
+              </form>
 
-          <p className="hint">
-            En utilisant YachtGenius Auth, vous acceptez nos bonnes pratiques : sécurité, sobriété des
-            mots de passe et vigilance sur les liens reçus.
-          </p>
+              <p className="hint">
+                En utilisant YachtGenius Auth, vous acceptez nos bonnes pratiques : securite, sobriete des
+                mots de passe et vigilance sur les liens recus.
+              </p>
             </>
           )}
         </section>

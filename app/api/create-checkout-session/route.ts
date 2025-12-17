@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
       customerId = customer.id;
     }
 
+    const baseAppUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'http://localhost:3000';
+
     // 4. Create Checkout Session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -56,8 +58,8 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/auth?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/auth?canceled=true`,
+      success_url: `${baseAppUrl}/auth?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseAppUrl}/auth?canceled=true`,
       metadata: {
         supabase_user_id: user.id,
       },
