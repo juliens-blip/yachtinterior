@@ -66,7 +66,11 @@ export default function AuthPage() {
             if (interval) clearInterval(interval);
             if (timeout) clearTimeout(timeout);
             setStatus('Abonnement active ! Redirection...');
-            setTimeout(() => router.push('/'), 2000);
+            setTimeout(() => {
+              router.push('/');
+              // Force navigation in cas de blocage client
+              setTimeout(() => (window.location.href = '/'), 500);
+            }, 2000);
           }
         }, 2000);
 
@@ -114,7 +118,10 @@ export default function AuthPage() {
 
       syncSubscription();
       // Fallback pour éviter de rester bloqué sur /auth
-      setTimeout(() => router.push('/'), 5000);
+      setTimeout(() => {
+        router.push('/');
+        setTimeout(() => (window.location.href = '/'), 500);
+      }, 5000);
 
       return () => {
         if (interval) clearInterval(interval);
@@ -183,6 +190,7 @@ export default function AuthPage() {
         await setSupabaseCookies();
         setStatus('Connexion reussie. Redirection...');
         router.push('/');
+        setTimeout(() => (window.location.href = '/'), 500);
       }
     } else {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
