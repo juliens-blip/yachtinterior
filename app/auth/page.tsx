@@ -113,6 +113,8 @@ export default function AuthPage() {
       };
 
       syncSubscription();
+      // Fallback pour éviter de rester bloqué sur /auth
+      setTimeout(() => router.push('/'), 5000);
 
       return () => {
         if (interval) clearInterval(interval);
@@ -179,32 +181,8 @@ export default function AuthPage() {
         setError(signInError.message);
       } else {
         await setSupabaseCookies();
-        // Check subscription status
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: subscription } = await supabase
-          .from('subscriptions')
-          .select('status, current_period_end')
-          .eq('user_id', user!.id)
-          .maybeSingle();
-
-        const now = new Date();
-        const isActive =
-          subscription?.status === 'active' ||
-          subscription?.status === 'trialing' ||
-          (subscription?.status === 'past_due' &&
-            subscription?.current_period_end &&
-            new Date(subscription.current_period_end) > now) ||
-          (subscription?.status === 'canceled' &&
-            subscription?.current_period_end &&
-            new Date(subscription.current_period_end) > now);
-
-        if (isActive) {
-          setStatus('Connexion reussie. Redirection...');
-          router.push('/');
-        } else {
-          setStatus('Abonnement requis');
-          setMode('payment');
-        }
+        setStatus('Connexion reussie. Redirection...');
+        router.push('/');
       }
     } else {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
