@@ -54,7 +54,7 @@ export default function AuthPage() {
             .from('subscriptions')
             .select('status')
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
 
           const isActive =
             data?.status === 'active' ||
@@ -185,7 +185,7 @@ export default function AuthPage() {
           .from('subscriptions')
           .select('status, current_period_end')
           .eq('user_id', user!.id)
-          .single();
+          .maybeSingle();
 
         const now = new Date();
         const isActive =

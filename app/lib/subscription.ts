@@ -14,7 +14,7 @@ export async function hasActiveSubscription(accessToken?: string): Promise<boole
     .from('subscriptions')
     .select('status, current_period_end')
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
   if (!data) return false;
 
