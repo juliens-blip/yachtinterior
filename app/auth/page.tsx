@@ -17,6 +17,19 @@ export default function AuthPage() {
   const [status, setStatus] = useState('');
   const [checkingSubscription, setCheckingSubscription] = useState(false);
 
+  const setSupabaseCookies = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    const refreshToken = sessionData.session?.refresh_token;
+
+    if (accessToken) {
+      document.cookie = `sb-access-token=${accessToken}; path=/; max-age=3600; SameSite=Lax;`;
+    }
+    if (refreshToken) {
+      document.cookie = `sb-refresh-token=${refreshToken}; path=/; max-age=2592000; SameSite=Lax;`;
+    }
+  };
+
   // Check for Stripe return (success/canceled)
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -33,6 +46,7 @@ export default function AuthPage() {
 
       const startPolling = () => {
         interval = setInterval(async () => {
+          await setSupabaseCookies();
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
 
@@ -164,6 +178,7 @@ export default function AuthPage() {
       if (signInError) {
         setError(signInError.message);
       } else {
+        await setSupabaseCookies();
         // Check subscription status
         const { data: { user } } = await supabase.auth.getUser();
         const { data: subscription } = await supabase
