@@ -23,11 +23,14 @@ export default function AuthPage() {
     const refreshToken = sessionData.session?.refresh_token;
 
     if (accessToken) {
-      document.cookie = `sb-access-token=${accessToken}; path=/; max-age=3600; SameSite=Lax;`;
+      document.cookie = `sb-access-token=${accessToken}; path=/; max-age=3600; SameSite=Lax; Secure`;
     }
     if (refreshToken) {
-      document.cookie = `sb-refresh-token=${refreshToken}; path=/; max-age=2592000; SameSite=Lax;`;
+      document.cookie = `sb-refresh-token=${refreshToken}; path=/; max-age=2592000; SameSite=Lax; Secure`;
     }
+
+    // Wait for cookies to be propagated before navigation
+    await new Promise(resolve => setTimeout(resolve, 150));
   };
 
   // Check for Stripe return (success/canceled)
@@ -68,9 +71,7 @@ export default function AuthPage() {
             setStatus('Abonnement active ! Redirection...');
             setTimeout(() => {
               router.push('/');
-              // Force navigation in cas de blocage client
-              setTimeout(() => (window.location.href = '/'), 500);
-            }, 2000);
+            }, 1000);
           }
         }, 2000);
 
@@ -189,8 +190,9 @@ export default function AuthPage() {
       } else {
         await setSupabaseCookies();
         setStatus('Connexion reussie. Redirection...');
-        router.push('/');
-        setTimeout(() => (window.location.href = '/'), 500);
+        setTimeout(() => {
+          router.push('/');
+        }, 200);
       }
     } else {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
