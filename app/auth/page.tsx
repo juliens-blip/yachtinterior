@@ -42,7 +42,12 @@ export default function AuthPage() {
             .eq('user_id', user.id)
             .single();
 
-          if (data?.status === 'active') {
+          const isActive =
+            data?.status === 'active' ||
+            data?.status === 'trialing' ||
+            data?.status === 'past_due';
+
+          if (isActive) {
             setCheckingSubscription(false);
             if (interval) clearInterval(interval);
             if (timeout) clearTimeout(timeout);
@@ -167,8 +172,16 @@ export default function AuthPage() {
           .eq('user_id', user!.id)
           .single();
 
-        const isActive = subscription?.status === 'active' ||
-          (subscription?.status === 'canceled' && subscription?.current_period_end && new Date(subscription.current_period_end) > new Date());
+        const now = new Date();
+        const isActive =
+          subscription?.status === 'active' ||
+          subscription?.status === 'trialing' ||
+          (subscription?.status === 'past_due' &&
+            subscription?.current_period_end &&
+            new Date(subscription.current_period_end) > now) ||
+          (subscription?.status === 'canceled' &&
+            subscription?.current_period_end &&
+            new Date(subscription.current_period_end) > now);
 
         if (isActive) {
           setStatus('Connexion reussie. Redirection...');
