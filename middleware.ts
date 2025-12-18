@@ -63,32 +63,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth', request.url));
     }
 
-    // Check subscription status
-    const { data: subscription, error: subError } = await supabase
-      .from('subscriptions')
-      .select('status, current_period_end')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (subError) {
-      console.warn('[MIDDLEWARE] Subscription lookup error, allowing through:', subError.message);
-      return response;
-    }
-
-    const now = new Date();
-    const hasActiveSubscription =
-      subscription?.status === 'active' ||
-      subscription?.status === 'trialing' ||
-      (subscription?.status === 'canceled' &&
-       subscription?.current_period_end &&
-       new Date(subscription.current_period_end) > now) ||
-      (subscription?.status === 'past_due' &&
-       subscription?.current_period_end &&
-       new Date(subscription.current_period_end) > now);
-
-    if (!hasActiveSubscription) {
-      return NextResponse.redirect(new URL('/auth', request.url));
-    }
+    // Subscription check temporarily disabled to avoid redirect loop
+    return response;
   }
 
   return response;
