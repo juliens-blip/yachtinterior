@@ -138,7 +138,7 @@ export default function Home() {
     return (
       <div className="app-container">
         <main className="main-content">
-          <p>Vérification de la session...</p>
+          <p>Checking session...</p>
         </main>
       </div>
     );
@@ -151,10 +151,10 @@ export default function Home() {
         <div className="powered-by">POWERED BY AI</div>
         <div className="auth-actions">
           <button className="btn-primary" onClick={handleManageSubscription}>
-            Gérer l'abonnement
+            Manage subscription
           </button>
           <button className="btn-primary" onClick={handleSignOut}>
-            Déconnexion
+            Sign out
           </button>
         </div>
       </nav>

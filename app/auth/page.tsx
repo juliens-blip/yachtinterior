@@ -26,7 +26,7 @@ export default function AuthPage() {
 
     if (success) {
       setCheckingSubscription(true);
-      setStatus('Verification de votre abonnement...');
+      setStatus('Verifying your subscription...');
 
       let interval: ReturnType<typeof setInterval> | undefined;
       let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -51,7 +51,7 @@ export default function AuthPage() {
             setCheckingSubscription(false);
             if (interval) clearInterval(interval);
             if (timeout) clearTimeout(timeout);
-            setStatus('Abonnement active ! Redirection...');
+            setStatus('Subscription active! Redirecting...');
             setTimeout(() => {
               router.push('/');
             }, 1000);
@@ -61,7 +61,7 @@ export default function AuthPage() {
         timeout = setTimeout(() => {
           if (interval) clearInterval(interval);
           setCheckingSubscription(false);
-          setError('Delai depasse. Merci de rafraichir la page.');
+          setError('Timed out. Please refresh the page.');
         }, 30000);
       };
 
@@ -82,18 +82,18 @@ export default function AuthPage() {
 
             if (!response.ok) {
               const payload = await response.json();
-              throw new Error(payload.error || 'Synchronisation impossible');
+              throw new Error(payload.error || 'Unable to sync');
             }
-            setStatus('Abonnement en cours de validation...');
+            setStatus('Subscription is being validated...');
           } else {
-            // Pas de session_id: on compte sur le webhook
-            setStatus('Abonnement en cours de validation via webhook...');
+            // No session_id: rely on the webhook
+            setStatus('Subscription is being validated via webhook...');
           }
         } catch (err) {
           setError(
             err instanceof Error
               ? err.message
-              : 'Impossible de synchroniser la subscription. Le webhook finira peut-etre le travail dans quelques secondes.'
+              : 'Unable to sync the subscription. The webhook should finish in a few seconds.'
           );
         } finally {
           startPolling();
@@ -101,7 +101,7 @@ export default function AuthPage() {
       };
 
       syncSubscription();
-      // Fallback pour éviter de rester bloqué sur /auth
+      // Fallback to avoid getting stuck on /auth
       setTimeout(() => {
         router.push('/');
         setTimeout(() => (window.location.href = '/'), 500);
@@ -114,7 +114,7 @@ export default function AuthPage() {
     }
 
     if (canceled) {
-      setError('Paiement annule. Vous pouvez reessayer.');
+      setError('Payment canceled. You can try again.');
     }
   }, [router]);
 
@@ -124,7 +124,7 @@ export default function AuthPage() {
       const { data: sessionData } = await supabase.auth.getSession();
 
       if (!sessionData.session?.access_token) {
-        setError('Session expiree. Merci de te reconnecter.');
+        setError('Session expired. Please sign in again.');
         setLoading(false);
         return;
       }
@@ -145,7 +145,7 @@ export default function AuthPage() {
 
       window.location.href = url;
     } catch (err) {
-      setError('Erreur lors de la creation de la session de paiement');
+      setError('Error creating payment session.');
       setLoading(false);
     }
   };
@@ -156,7 +156,7 @@ export default function AuthPage() {
     setStatus('');
 
     if (mode === 'signup' && password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.');
+      setError('Passwords do not match.');
       return;
     }
 
@@ -171,7 +171,7 @@ export default function AuthPage() {
       if (signInError) {
         setError(signInError.message);
       } else {
-        setStatus('Connexion reussie. Redirection...');
+        setStatus('Signed in. Redirecting...');
         // Wait a bit for Supabase SSR to set cookies
         setTimeout(() => {
           router.push('/');
@@ -190,15 +190,15 @@ export default function AuthPage() {
         setError(signUpError.message);
       } else if (signUpData.session) {
         // If email confirmation is disabled, session comes back immediately
-        setStatus('Compte cree ! Abonnement requis...');
+        setStatus('Account created! Subscription required...');
         setTimeout(() => setMode('payment'), 1000);
       } else if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
         // Email already used
-        setError('Cet email est deja enregistre. Essaie de te connecter.');
+        setError('This email is already registered. Try signing in.');
         setMode('signin');
       } else {
         // Email confirmation required
-        setStatus('Un email de confirmation a ete envoye. Verifie ta boite mail pour activer ton compte.');
+        setStatus('A confirmation email has been sent. Check your inbox to activate your account.');
         setMode('signin');
       }
     }
@@ -211,25 +211,25 @@ export default function AuthPage() {
       <nav className="navbar glass-panel auth-nav">
         <div className="logo">YachtGenius</div>
         <button className="btn-primary" onClick={() => router.push('/')}>
-          Retour
+          Back
         </button>
       </nav>
 
       <main className="auth-grid">
         <section className="auth-hero glass-panel">
-          <p className="eyebrow">Securise par Supabase</p>
+          <p className="eyebrow">Secured by Supabase</p>
           <h1>
-            Acces YachtGenius
+            YachtGenius
             <span className="accent"> Auth</span>
           </h1>
           <p className="lead">
-            Connecte-toi pour poursuivre tes redesigns ou cree un compte pour lancer ta premiere
-            transformation d&apos;interieur.
+            Sign in to continue your redesigns or create an account to launch your first interior
+            transformation.
           </p>
           <div className="hero-highlight">
-            <p>Controle total</p>
-            <p>Historique synchronise</p>
-            <p>Sessions securisees</p>
+            <p>Full control</p>
+            <p>Synced history</p>
+            <p>Secure sessions</p>
           </div>
         </section>
 
@@ -237,7 +237,7 @@ export default function AuthPage() {
           {mode === 'payment' ? (
             <div className="payment-section">
               <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: '#D4AF37' }}>
-                Abonnement YachtGenius Pro
+                YachtGenius Pro Subscription
               </h2>
 
               <div className="pricing-card" style={{
@@ -248,7 +248,7 @@ export default function AuthPage() {
                 border: '1px solid rgba(255, 255, 255, 0.1)'
               }}>
                 <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#D4AF37' }}>
-                  12 EUR<span style={{ fontSize: '1.5rem' }}>/mois</span>
+                  12 EUR<span style={{ fontSize: '1.5rem' }}>/month</span>
                 </div>
 
                 <ul style={{
@@ -257,11 +257,11 @@ export default function AuthPage() {
                   lineHeight: '2',
                   textAlign: 'left'
                 }}>
-                  <li>- Generations illimitees d'interieurs</li>
-                  <li>- 5 styles uniques par generation</li>
-                  <li>- IA Gemini 2.5 Flash</li>
-                  <li>- Images haute resolution</li>
-                  <li>- Support prioritaire</li>
+                  <li>- Unlimited interior generations</li>
+                  <li>- 5 unique styles per generation</li>
+                  <li>- Gemini 2.5 Flash AI</li>
+                  <li>- High-resolution images</li>
+                  <li>- Priority support</li>
                 </ul>
 
                 {error && <p className="status error" style={{ marginBottom: '1rem' }}>{error}</p>}
@@ -273,11 +273,11 @@ export default function AuthPage() {
                   disabled={loading || checkingSubscription}
                   style={{ width: '100%', padding: '1rem', marginBottom: '1rem' }}
                 >
-                  {loading ? 'Redirection vers Stripe...' : checkingSubscription ? 'Verification...' : 'S\'abonner maintenant'}
+                  {loading ? 'Redirecting to Stripe...' : checkingSubscription ? 'Verifying...' : 'Subscribe now'}
                 </button>
 
                 <p style={{ opacity: 0.7, fontSize: '0.9rem' }}>
-                  Paiement securise par Stripe. Annulez a tout moment.
+                  Secure payment via Stripe. Cancel anytime.
                 </p>
 
                 <button
@@ -292,7 +292,7 @@ export default function AuthPage() {
                   }}
                   type="button"
                 >
-                  Retour a la connexion
+                  Back to sign in
                 </button>
               </div>
             </div>
@@ -304,14 +304,14 @@ export default function AuthPage() {
                   onClick={() => setMode('signin')}
                   type="button"
                 >
-                  Connexion
+                  Sign in
                 </button>
                 <button
                   className={mode === 'signup' ? 'toggle active' : 'toggle'}
                   onClick={() => setMode('signup')}
                   type="button"
                 >
-                  Creation
+                  Sign up
                 </button>
               </div>
 
@@ -328,7 +328,7 @@ export default function AuthPage() {
                 </label>
 
                 <label className="field">
-                  <span>Mot de passe</span>
+                  <span>Password</span>
                   <input
                     type="password"
                     placeholder="********"
@@ -341,7 +341,7 @@ export default function AuthPage() {
 
                 {mode === 'signup' && (
                   <label className="field">
-                    <span>Confirme le mot de passe</span>
+                    <span>Confirm password</span>
                     <input
                       type="password"
                       placeholder="********"
@@ -357,13 +357,13 @@ export default function AuthPage() {
                 {status && <p className="status success">{status}</p>}
 
                 <button className="btn-gold full" type="submit" disabled={loading}>
-                  {loading ? 'Traitement...' : mode === 'signin' ? 'Se connecter' : "Creer l'acces"}
+                  {loading ? 'Processing...' : mode === 'signin' ? 'Sign in' : 'Create account'}
                 </button>
               </form>
 
               <p className="hint">
-                En utilisant YachtGenius Auth, vous acceptez nos bonnes pratiques : securite, sobriete des
-                mots de passe et vigilance sur les liens recus.
+                By using YachtGenius Auth, you agree to our best practices: security, sensible passwords,
+                and caution with links you receive.
               </p>
             </>
           )}
