@@ -22,6 +22,7 @@ export default function Home() {
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -43,8 +44,8 @@ export default function Home() {
       const hasActiveSubscription =
         subscription?.status === 'active' ||
         (subscription?.status === 'canceled' &&
-         subscription?.current_period_end &&
-         new Date(subscription.current_period_end) > new Date());
+          subscription?.current_period_end &&
+          new Date(subscription.current_period_end) > new Date());
 
       if (!hasActiveSubscription) {
         router.replace('/auth');
@@ -67,6 +68,24 @@ export default function Home() {
       authListener?.subscription.unsubscribe();
     };
   }, [router]);
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (lightboxIndex === null) return;
+
+      if (e.key === 'Escape') {
+        setLightboxIndex(null);
+      } else if (e.key === 'ArrowLeft') {
+        setLightboxIndex((lightboxIndex - 1 + generatedImages.length) % generatedImages.length);
+      } else if (e.key === 'ArrowRight') {
+        setLightboxIndex((lightboxIndex + 1) % generatedImages.length);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIndex, generatedImages.length]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -255,7 +274,11 @@ export default function Home() {
 
             <div className="gallery-grid">
               {generatedImages.map((item, index) => (
-                <div key={index} className="gallery-item">
+                <div
+                  key={index}
+                  className="gallery-item"
+                  onClick={() => setLightboxIndex(index)}
+                >
                   <img src={item.url} alt={item.style} />
                   <div className="style-info">
                     <div className="style-label">{item.style}</div>
@@ -263,9 +286,74 @@ export default function Home() {
                       PROMPT: {item.prompt.slice(0, 60)}...
                     </div>
                   </div>
+                  <div className="gallery-item-overlay">
+                    <span className="view-icon">⤢</span>
+                  </div>
                 </div>
               ))}
             </div>
+
+            {/* Lightbox Carousel */}
+            {lightboxIndex !== null && (
+              <div className="lightbox-overlay" onClick={() => setLightboxIndex(null)}>
+                <button
+                  className="lightbox-close"
+                  onClick={(e) => { e.stopPropagation(); setLightboxIndex(null); }}
+                  aria-label="Close lightbox"
+                >
+                  ✕
+                </button>
+
+                <button
+                  className="lightbox-nav lightbox-prev"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxIndex((lightboxIndex - 1 + generatedImages.length) % generatedImages.length);
+                  }}
+                  aria-label="Previous image"
+                >
+                  ‹
+                </button>
+
+                <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+                  <img
+                    src={generatedImages[lightboxIndex].url}
+                    alt={generatedImages[lightboxIndex].style}
+                    className="lightbox-image"
+                  />
+                  <div className="lightbox-info">
+                    <div className="lightbox-style">{generatedImages[lightboxIndex].style}</div>
+                    <div className="lightbox-prompt">{generatedImages[lightboxIndex].prompt}</div>
+                    <div className="lightbox-counter">
+                      {lightboxIndex + 1} / {generatedImages.length}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  className="lightbox-nav lightbox-next"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxIndex((lightboxIndex + 1) % generatedImages.length);
+                  }}
+                  aria-label="Next image"
+                >
+                  ›
+                </button>
+
+                <div className="lightbox-thumbnails">
+                  {generatedImages.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className={`lightbox-thumbnail ${idx === lightboxIndex ? 'active' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); setLightboxIndex(idx); }}
+                    >
+                      <img src={item.url} alt={item.style} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

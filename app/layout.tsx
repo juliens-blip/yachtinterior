@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import './lightbox.css'
 
 export const metadata: Metadata = {
   title: 'YachtGenius - AI Interior Redesign',
