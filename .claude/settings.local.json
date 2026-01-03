@@ -15,7 +15,15 @@
       "Bash(curl:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(then echo \"=== Environment Variables Check ===\")",
+      "Bash(else echo \".env file not found\")",
+      "Bash(if [ -f \".env.local\" ])",
+      "Bash(then echo \"=== .env.local Found ===\")",
+      "Bash(else echo \".env.local file not found\")",
+      "Bash(node -e:*)",
+      "Bash(node:*)",
+      "Bash(stripe:*)"
     ],
     "deny": [],
     "ask": []

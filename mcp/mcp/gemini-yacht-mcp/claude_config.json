@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "gemini-yacht": {
+      "command": "python",
+      "args": [
+        "C:\\Users\\beatr\\Documents\\projets\\yacht interior\\mcp\\gemini-yacht-mcp\\main.py"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+        "GEMINI_MODEL": "gemini-2.5-flash",
+        "GEMINI_TIMEOUT": "60",
+        "LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}

@@ -1,0 +1,87 @@
+gemini-yacht-mcp/
+│
+├── README.md                   # Main documentation
+├── INSTALL.md                  # Installation guide
+├── QUICKSTART.md               # 5-minute setup guide
+├── EXAMPLES.md                 # Detailed usage examples
+├── ARCHITECTURE.md             # Technical architecture
+├── CHANGELOG.md                # Version history
+├── LICENSE                     # MIT License
+├── TREE.txt                    # This file
+│
+├── requirements.txt            # Python dependencies
+├── .env.example               # Environment template
+├── .gitignore                 # Git ignore rules
+│
+├── claude_config.json         # Claude Code configuration
+├── main.py                    # FastMCP server entry point
+├── test_server.py             # Test suite
+│
+├── handlers/                  # Tool implementations
+│   ├── __init__.py
+│   └── tools.py              # 4 tool handlers:
+│                               - analyze_yacht_structure
+│                               - generate_yacht_style
+│                               - generate_all_styles
+│                               - list_available_styles
+│
+├── models/                    # Data validation
+│   ├── __init__.py
+│   └── schemas.py            # Pydantic schemas:
+│                               - YachtStyle (enum)
+│                               - Input schemas
+│                               - Output schemas
+│
+└── utils/                     # Utilities
+    ├── __init__.py
+    ├── gemini_client.py      # Gemini API client:
+    │                           - GeminiClient (singleton)
+    │                           - Image processing
+    │                           - Async API calls
+    │
+    └── prompts.py            # Prompt templates:
+                                - ANALYSIS_PROMPT
+                                - STYLE_GENERATION_PROMPTS
+                                - STYLE_DESCRIPTIONS
+
+
+File Count:
+-----------
+Total: 21 files
+  - Python: 9 files
+  - Markdown: 6 files
+  - Config: 3 files
+  - Text: 3 files
+
+
+Lines of Code (estimated):
+--------------------------
+main.py:              ~250 lines
+handlers/tools.py:    ~400 lines
+models/schemas.py:    ~180 lines
+utils/gemini_client.py: ~260 lines
+utils/prompts.py:     ~200 lines
+test_server.py:       ~320 lines
+--------------------------
+Total Python:         ~1,610 lines
+
+
+Documentation (estimated):
+--------------------------
+README.md:            ~500 lines
+INSTALL.md:           ~250 lines
+QUICKSTART.md:        ~120 lines
+EXAMPLES.md:          ~600 lines
+ARCHITECTURE.md:      ~600 lines
+CHANGELOG.md:         ~150 lines
+--------------------------
+Total Docs:           ~2,220 lines
+
+
+Project Statistics:
+-------------------
+Total Lines:          ~3,830 lines
+Code-to-Docs Ratio:   1:1.4 (well-documented)
+Test Coverage:        6 comprehensive tests
+Supported Styles:     5 yacht design styles
+MCP Tools:            4 exposed tools

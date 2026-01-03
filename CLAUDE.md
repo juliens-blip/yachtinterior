@@ -285,9 +285,34 @@ User voit:
 - Chaque image avec:
   * Nom du style
   * Preview du prompt utilisé
+  * Overlay au survol avec icône de zoom
 
 Action:
 - Bouton "New Sequence" → retour à landing
+- Click sur image → ouvre Lightbox Carrousel
+```
+
+### 5. Lightbox Carrousel (lightboxIndex !== null)
+```
+User voit:
+- Image en plein écran avec overlay sombre
+- Informations du style (nom + prompt complet)
+- Indicateur de position (ex: "2 / 5")
+- Boutons de navigation (← →) sur les côtés
+- Miniatures des 5 images en bas
+- Bouton fermer (✕) en haut à droite
+
+Actions:
+- Flèche gauche (← ou bouton) → image précédente
+- Flèche droite (→ ou bouton) → image suivante
+- Click miniature → aller à cette image
+- Escape / Click ✕ / Click overlay → fermer lightbox
+
+Fonctionnalités:
+- Navigation infinie (boucle de 5→1 et 1→5)
+- Animations fluides (fade-in, zoom)
+- Design responsive (adapté mobile)
+- Navigation clavier (←, →, Escape)
 ```
 
 ---
@@ -517,7 +542,7 @@ Malgré les prompts stricts, Gemini peut modifier la géométrie.
 - [ ] Historique de générations (DB)
 
 ### Phase 4: Améliorations Frontend
-- [ ] Galerie avec zoom sur images
+- [x] Galerie avec zoom sur images (Lightbox Carrousel)
 - [ ] Download des images générées
 - [ ] Comparaison avant/après (slider)
 - [ ] Personnalisation des styles
@@ -689,11 +714,45 @@ const metrics = {
 
 ---
 
-**Version:** 1.0.0
-**Dernière mise à jour:** 2025-11-28
+## 📜 CHANGELOG
+
+### v1.1.0 - 2025-12-27
+**Nouvelle fonctionnalité: Lightbox Carrousel**
+
+Ajout de la possibilité de cliquer sur une image générée pour la voir en grand format avec un système de carrousel.
+
+**Fichiers ajoutés/modifiés:**
+- `app/lightbox.css` (nouveaux) - Styles CSS pour le lightbox
+- `app/page.tsx` - Composant lightbox et gestion d'état
+- `app/layout.tsx` - Import du CSS lightbox
+
+**Fonctionnalités:**
+- Clic sur image → ouvre lightbox plein écran
+- Navigation avec boutons flèches (← →)
+- Navigation avec flèches clavier
+- Miniatures cliquables en bas
+- Indicateur de position (1/5, 2/5, etc.)
+- Fermeture avec ✕, Escape, ou clic en dehors
+- Design premium avec animations fluides
+- Responsive mobile
+
+**Commit:** `631d37c` - "feat: add lightbox carousel for generated images"
+
+---
+
+### v1.0.0 - 2025-11-28
+- Version initiale avec génération de 5 styles d'intérieurs
+- Migration vers Next.js 14
+- Intégration Gemini 2.5 Flash
+
+---
+
+**Version:** 1.1.0
+**Dernière mise à jour:** 2025-12-27
 **Auteur:** YachtGenius Team
 **Maintenu par:** Claude Code avec Agents Spécialisés
 
 ---
 
 *Ce fichier est vivant et doit être mis à jour à chaque modification majeure du projet.*
+
