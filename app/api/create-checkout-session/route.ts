@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/app/lib/stripe';
+import { getStripe } from '@/app/lib/stripe';
 import { createClient } from '@/app/lib/supabase-server';
+import { getStripePriceId } from '@/app/lib/stripe-config';
 
 // Force dynamic rendering - prevent static generation during build
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe();
+    const stripePriceId = getStripePriceId();
+
     const authHeader = request.headers.get('authorization');
     const accessToken = authHeader?.toLowerCase().startsWith('bearer ')
       ? authHeader.slice(7)
@@ -55,7 +59,7 @@ export async function POST(request: NextRequest) {
       allow_promotion_codes: true,
       line_items: [
         {
-          price: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID!,
+          price: stripePriceId,
           quantity: 1,
         },
       ],

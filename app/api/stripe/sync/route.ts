@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { stripe } from '@/app/lib/stripe';
+import { getStripe } from '@/app/lib/stripe';
 import { upsertSubscription } from '@/app/lib/subscription';
 import { createClient } from '@/app/lib/supabase-server';
 
@@ -13,6 +13,7 @@ type SyncPayload = {
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe();
     const { session_id: sessionId }: SyncPayload = await request.json();
     const authHeader = request.headers.get('authorization');
     const accessToken = authHeader?.toLowerCase().startsWith('bearer ')

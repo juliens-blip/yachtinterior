@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/app/lib/stripe';
+import { getStripe } from '@/app/lib/stripe';
 import { upsertSubscription } from '@/app/lib/subscription';
+import { getStripeWebhookSecret } from '@/app/lib/stripe-config';
 import Stripe from 'stripe';
 
 // Force dynamic rendering - prevent static generation during build
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const stripe = getStripe();
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
+  const stripeWebhookSecret = getStripeWebhookSecret();
   const toIso = (ts?: number | null) =>
     ts ? new Date(ts * 1000).toISOString() : null;
 
@@ -26,7 +29,7 @@ export async function POST(request: NextRequest) {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      stripeWebhookSecret
     );
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
