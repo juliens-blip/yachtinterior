@@ -1,10 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
 
 type Mode = 'signin' | 'signup' | 'payment';
+
+const hasActiveSubscription = (
+  status?: string | null,
+  currentPeriodEnd?: string | null
+) => {
+  if (status === 'active' || status === 'trialing' || status === 'past_due') {
+    return true;
+  }
+
+  if (status === 'canceled' && currentPeriodEnd) {
+    return new Date(currentPeriodEnd) > new Date();
+  }
+
+  return false;
+};
 
 export default function AuthPage() {
   const router = useRouter();
@@ -16,6 +31,25 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [checkingSubscription, setCheckingSubscription] = useState(false);
+
+  const routeSignedInUser = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('status, current_period_end')
+      .eq('user_id', session.user.id)
+      .maybeSingle();
+
+    if (hasActiveSubscription(subscription?.status, subscription?.current_period_end)) {
+      router.replace('/');
+      return;
+    }
+
+    setMode('payment');
+    setStatus('Subscription required to continue.');
+  }, [router]);
 
   // Check for Stripe return (success/canceled)
   useEffect(() => {
@@ -118,6 +152,15 @@ export default function AuthPage() {
     }
   }, [router]);
 
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const success = searchParams.get('success');
+    const canceled = searchParams.get('canceled');
+
+    if (success || canceled) return;
+    routeSignedInUser();
+  }, [routeSignedInUser]);
+
   const handleSubscribe = async () => {
     setLoading(true);
     try {
@@ -171,11 +214,8 @@ export default function AuthPage() {
       if (signInError) {
         setError(signInError.message);
       } else {
-        setStatus('Signed in. Redirecting...');
-        // Wait a bit for Supabase SSR to set cookies
-        setTimeout(() => {
-          router.push('/');
-        }, 300);
+        setStatus('Signed in. Checking subscription...');
+        await routeSignedInUser();
       }
     } else {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
