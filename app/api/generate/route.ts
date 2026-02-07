@@ -166,6 +166,37 @@ NOW GENERATE THE IMAGE.
 // Force dynamic rendering - prevent static generation during build
 export const dynamic = 'force-dynamic';
 
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+
+type GeneratePayload = {
+  imageBase64?: string;
+  imageMimeType?: string;
+};
+
+const parseGeminiErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    try {
+      const parsed = JSON.parse(error.message);
+      if (parsed?.error?.message) {
+        return String(parsed.error.message);
+      }
+    } catch {
+      return error.message;
+    }
+
+    return error.message;
+  }
+
+  return 'Unknown error while generating images';
+};
+
+const isLeakedGeminiKeyError = (message: string): boolean =>
+  /api key was reported as leaked/i.test(message);
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -197,11 +228,23 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Continue with image generation
-    const { imageBase64 } = await request.json();
+    const { imageBase64, imageMimeType }: GeneratePayload = await request.json();
 
-    if (!imageBase64) {
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
       return NextResponse.json({ error: 'Missing image data' }, { status: 400 });
     }
+
+    const normalizedMimeType =
+      typeof imageMimeType === 'string' ? imageMimeType.trim().toLowerCase() : 'image/jpeg';
+
+    if (!ALLOWED_IMAGE_MIME_TYPES.has(normalizedMimeType)) {
+      return NextResponse.json(
+        { error: `Unsupported image format: ${normalizedMimeType}. Use JPG, PNG, or WEBP.` },
+        { status: 400 }
+      );
+    }
+
+    const normalizedImageBase64 = imageBase64.replace(/\s/g, '');
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -230,20 +273,25 @@ export async function POST(request: NextRequest) {
       Focus on the "shell" of the room.
     `;
 
-    const structureResult = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [
-        { text: structurePrompt },
-        {
-          inlineData: {
-            data: imageBase64,
-            mimeType: "image/jpeg"
+    let structureDescription = 'Structure analysis unavailable; preserve geometry exactly.';
+    try {
+      const structureResult = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          { text: structurePrompt },
+          {
+            inlineData: {
+              data: normalizedImageBase64,
+              mimeType: normalizedMimeType
+            }
           }
-        }
-      ]
-    });
+        ]
+      });
 
-    const structureDescription = structureResult.text || "Structure analysis completed";
+      structureDescription = structureResult.text || structureDescription;
+    } catch (structureError) {
+      console.error('[Generate] Structure analysis failed:', structureError);
+    }
 
     // Phase 2: Generate styles
     const generatedImages = [];
@@ -262,8 +310,8 @@ export async function POST(request: NextRequest) {
             { text: engineeredPrompt },
             {
               inlineData: {
-                data: imageBase64,
-                mimeType: "image/jpeg"
+                data: normalizedImageBase64,
+                mimeType: normalizedMimeType
               }
             }
           ]
@@ -290,7 +338,7 @@ export async function POST(request: NextRequest) {
           imageUrl = `data:${mimeType};base64,${generatedImageBase64}`;
         } else {
           // Fallback to original image
-          imageUrl = `data:image/jpeg;base64,${imageBase64}`;
+          imageUrl = `data:${normalizedMimeType};base64,${normalizedImageBase64}`;
         }
 
         generatedImages.push({
@@ -304,7 +352,7 @@ export async function POST(request: NextRequest) {
         generatedImages.push({
           style: style.name,
           prompt: engineeredPrompt,
-          url: `data:image/jpeg;base64,${imageBase64}`,
+          url: `data:${normalizedMimeType};base64,${normalizedImageBase64}`,
           isFallback: true
         });
       }
@@ -314,9 +362,15 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error in /api/generate:', error);
+    const detail = parseGeminiErrorMessage(error);
+    const status = isLeakedGeminiKeyError(detail) ? 503 : 500;
+    const errorMessage = isLeakedGeminiKeyError(detail)
+      ? 'Gemini API key is disabled (reported leaked). Rotate GEMINI_API_KEY in Vercel.'
+      : 'Image generation failed';
+
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: errorMessage, detail },
+      { status }
     );
   }
 }

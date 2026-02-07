@@ -20,6 +20,8 @@ export default function Home() {
   const [step, setStep] = useState<'landing' | 'upload' | 'processing' | 'results'>('landing');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState<string>('image/jpeg');
+  const [generationError, setGenerationError] = useState<string>('');
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -90,12 +92,20 @@ export default function Home() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setGenerationError('');
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
         setSelectedImage(result);
-        // Extract base64 data (remove "data:image/jpeg;base64," prefix)
-        const base64Data = result.split(',')[1];
+        // Extract base64 data (remove "data:image/*;base64," prefix)
+        const [dataUrlHeader, base64Data] = result.split(',', 2);
+        const detectedMimeType = dataUrlHeader
+          .match(/^data:(.*?);base64$/i)?.[1]
+          ?.toLowerCase();
+
+        if (detectedMimeType) {
+          setImageMimeType(detectedMimeType);
+        }
         setImageBase64(base64Data);
         setStep('upload');
       };
@@ -104,25 +114,41 @@ export default function Home() {
   };
 
   const generateInteriors = async () => {
+    if (!imageBase64) {
+      setGenerationError('No image found. Please upload one first.');
+      return;
+    }
+
+    setGenerationError('');
     setStep('processing');
     setIsAnalyzing(true);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
       // Call API route instead of direct Gemini call
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           imageBase64: imageBase64,
+          imageMimeType,
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-      if (data.error) {
-        console.error('Error:', data.error);
+      if (!response.ok || data.error) {
+        const serverMessage =
+          data.error || `Request failed with status ${response.status}`;
+        const detail = typeof data.detail === 'string' ? ` (${data.detail})` : '';
+        const fullMessage = `${serverMessage}${detail}`;
+        console.error('Error:', fullMessage);
+        setGenerationError(fullMessage);
         setStep('upload');
         setIsAnalyzing(false);
         return;
@@ -133,6 +159,9 @@ export default function Home() {
       setIsAnalyzing(false);
     } catch (error) {
       console.error('Error generating interiors:', error);
+      setGenerationError(
+        error instanceof Error ? error.message : 'Failed to generate interiors'
+      );
       setStep('upload');
       setIsAnalyzing(false);
     }
@@ -242,6 +271,9 @@ export default function Home() {
                   Execute Redesign
                 </button>
               </div>
+              {generationError && (
+                <p style={{ marginTop: '1rem', color: '#ff7676' }}>{generationError}</p>
+              )}
             </div>
           </div>
         )}
